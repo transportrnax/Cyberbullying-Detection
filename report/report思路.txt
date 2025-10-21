@@ -1,0 +1,146 @@
+我们的数据来源：Ejaz, Naveed; Choudhury, Salimur; Razi, Fakhra (2024), “A Comprehensive Dataset for Automated Cyberbullying Detection”, Mendeley Data, V2, doi: 10.17632/wmx9jj2htd.2。网络欺凌的特点是同伴之间具有攻击性、重复性和故意的交流。然而，大多数现有的网络欺凌检测数据集只关注攻击性文本（aggressive text），并将其分类为攻击性或非攻击性，而忽略了网络欺凌的其他三个方面 repetition, peer behavior, and intent to harm。该数据集是一个综合数据集，是由这四个特征生成的。
+
+攻击性文本、重复、同辈性和伤害意图的数据集
+
+每个数据集包含两列“No.”和“Message”，两者的数据量均为118829行，表明这两种数据之间分布均衡。我们把数据集分割为70%的训练集，15%的测试集，15%的验证集。
+在攻击性数据中，有40%的攻击性语言，30%的对敏感话题（种族、宗教、政治）的片面看法，还有一些是无意义的表达。
+在非攻击性数据中，它包含不具攻击性的普通评论。然而，它也包含了许多意图不明确的词语。
+
+数据处理：Digit removal，Stop words filtering：like “is, the, a，Remove punctuation，Stemming: as it can save more semantic information，Word segmentation: to cut sentence into word
+
+Methodology：
+1.首先是用了TFIDF和信息增益，得到特征矩阵，PCA降维，+ normalization。普通机器学习model：SVM + RF + LR
+
+2.TFIDF，它注重的是词出现的频率，而不是语义。所以改进了用平均词向量。Work2Vec提取的特征作为输入，然后用了MLP来训练
+	1) Input Layer
+	2) First Hidden Layer with 128 neurons and ReLU activation
+	3) Dropout Layer with a rate of 0.2
+	4) Second Hidden Layer with 128 neurons and ReLU activation
+	5) Dropout Layer with a rate of 0.5
+	6) Output Layer with 2 neurons and Softmax activationIn total
+Traditional Sentence Representation, simple averaging techniques where each word in the sentence has equal weight.
+Eg: Support a sentence contains N words , and word vectors are 𝑣_1,𝑣_2,….,𝑣_𝑛   ,
+then the  traditional average word vector s of the sentence is :𝑠=1/𝑁 ∑24_(𝑖=1)^𝑁▒𝑣_𝑖 
+Problem: Simple averaging is sensitive to random outliers and extreme values.
+Limitation：Equal weighting can reduce performance
+
+3.如果单纯用平均词向量的话，它没有办法表示一些重要的单词在句子中比较重要的地位。如果当出现一些异常值或者说一些奇怪的单词的时候，整句话就会被带偏。所以为了用偏重语义，所以我们使用Naive byse加权平均词向量来生成词向量作为输入，用深度前馈模型
+基本思路：
+计算特定类别中每个单词的频率，然后根据这些频率的比率来衡量该单词在文本分类中的重要性。通过计算每个单词的对数计数比率，为每个单词赋予一个权重。
+Step1—Generated word vector 
+Tool: Pre-trained word embedding models like Word2Vec.
+Why Word2Vec?
+Skip-gram model learns semantic relationships based on context and can adjust dynamically based on surrounding words.
+Step2—Word Frequency Weight Calculation :
+Compute word frequency in training data
+Calculate word frequency per class 
+Compute the probability for each word given a class
+Apply Laplace Smoothing (Add 1 smoothing) to avoid zero probabilities.
+Step3—Calculating Log-Count Ratios
+Calculate the log ratio between two classes for each word：(here is a formula)
+It measures the difference in the distribution of the word w in the two categories
+Step 4: Weighted Average
+Formula: For each word vector  𝒗_𝒘 in the sentence, apply its corresponding weight 𝒘 and compute the weighted average
+Model Select: Deep Feedforward Neural Networks
+Advantage : With their multi-layered structure, can capture complex nonlinear relationships and patterns.
+Layer structure：
+Layer 1：fully connected layer with 128 neurons + ReLU 
+layer 2： fully connected layer with 64 neurons +ReLU 
+Layer 3 ：Single neuron with sigmoid activation
+4.到这一步为止准确率很高，达到了99%，但是，在准确率高的同时，我们发现他对于一些极端词非常敏感，比如说fuck或说stupid这种负面性非常强的这种词的话，它还是会检测为攻击性文本，For example, ‘You’re so fucking beautiful’ was wrongly labeled as aggressive because of the f-word, even though the overall meaning is positive. 他还不能区分这样的例子。我们后面的微调和改进用了对抗训练，我们进行了对抗性测试。我们手动生成了这些敏感词出现在正面或中性语境中的样本，例如图片中，并将其添加到我们的数据集中。并且引入了Nbeats，根据语义动态的调整词向量，这样因为不同意思，所以说它就会有不同的词向量。然后再用transformer的多头注意力机制。去训练模型，这样我们可以更贴近语义去判断这到底是攻击性还是非攻击性文本，而不是简单的文本判断。
+
+EXPERIMENTAL RESULTS：
+我们使用预测精度作为评估指标，对数据集的模型分类性能进行评估。此外，我们将我们改进和提升后的的结果与传统的文本表示和分类技术（如TF-IDF和NBSVM）进行了比较。我们还展示了Nbeats贴近语义去增强分类结果。
+评估结果
+我们使用了一套全面的绩效评估指标，包括准确性、召回率、loss率。
+如表I所示，我们使用通用的预训练Word2Vec模型来生成词向量，并使用MLP来训练预测类别，还有使用Naive byse加权平均词向量来生成词向量作为输入，用深度前馈来训练预测类别，还有一种类型是引入了对抗训练和Nbeats。计算分类精度，从而评估我们的方法。
+实验的分类表明，普通平均值计算句子向量的传统技术相比，使用Naive byse加权平均词向量和深度前馈可以提高准确性
+•使用word2Vec（86%）比使用传统TF-IDF（79%）时，数据集的总体准确性提高了7%
+•使用Naive byse加权平均词向量（99%）比使用传统word2Vec（86%）时，数据集的总体准确性提高了13%
+•在Naive byse加权平均词向量模型里引入Nbeats后，模型的准确率略有下降
+•三个模型的总体分类预测准确率最高的结果是使用我们的Naive byse模型，准确率约为99%
+与传统技术比较
+我们检测对于含有敏感词汇但整体语义为积极的句子进行判断。
+•使用传统TF-IDF，word2Vec和没有引用Nbeats的模型里，对于含有敏感词汇但整体语义为积极的句子的判断攻击性高达99%
+•在Naive byse加权平均词向量模型里引入Nbeats后，对于含有敏感词汇但整体语义为积极的句子识别率显著提高。由原来的99%的攻击性下降到0.06%
+
+
+参考我给你的代码，重新写report的Methodology部分。要介绍1.我们使用的 BERT模型，模型结构，预训练权重，输入格式 2.优化器和学习率，优化器的参数设置，作用 3.损失函数 CrossEntropyLoss 4. 训练和评估循环 5.早停机制 6. k-fold交叉验证 7. beatmodel的超参数超参数 8.mlp的全连接层。着重介绍我们的模型 ，体现我们使用了不同网络不同模型去改进准确率的这个过程
+
+\textbf{MLP Architecture:}
+\begin{itemize}
+    \item Input Layer: Takes Word2Vec embeddings of sentences.
+    \item First Hidden Layer: 128 neurons, ReLU activation, dropout rate = 0.2.
+    \item Second Hidden Layer: 128 neurons, ReLU activation, dropout rate = 0.5.
+    \item Output Layer: 2 neurons, Softmax activation.
+\end{itemize}
+\textbf{DNN Architecture:}
+\begin{itemize}
+    \item Layer 1: Fully connected, 128 neurons, ReLU activation.
+    \item Layer 2: Fully connected, 64 neurons, ReLU activation.
+    \item Layer 3: Single neuron, Sigmoid activation.
+\end{itemize}
+
+SVM：
+               precision    recall  f1-score   support
+
+           0       0.76      0.91      0.83     13561
+           1       0.88      0.68      0.77     12211
+
+    accuracy                           0.80     25772
+   macro avg       0.82      0.80      0.80     25772
+weighted avg       0.82      0.80      0.80     25772
+
+LR：
+              precision    recall  f1-score   support
+
+           0       0.77      0.90      0.83     13845
+           1       0.86      0.68      0.76     11926
+
+    accuracy                           0.80     25771
+   macro avg       0.81      0.79      0.79     25771
+weighted avg       0.81      0.80      0.80     25771
+
+RF：
+              precision    recall  f1-score   support
+
+           0       0.76      0.90      0.83     13592
+           1       0.86      0.69      0.77     12179
+...
+    accuracy                           0.89     25771
+   macro avg       0.89      0.89      0.89     25771
+weighted avg       0.89      0.89      0.89     25771
+
+word2Vec+NBLCN+mlp:
+Average Accuracy: 0.8563289710340245
+Classification Report (from each fold):
+
+Fold 1 Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.86      0.86      0.86      2674
+           1       0.84      0.84      0.84      2345
+
+    accuracy                           0.85      5019
+   macro avg       0.85      0.85      0.85      5019
+weighted avg       0.85      0.85      0.85      5019
+
+
+Fold 2 Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.88      0.85      0.86      2698
+           1       0.83      0.86      0.84      2321
+...
+    accuracy                           0.86      5018
+   macro avg       0.86      0.86      0.86      5018
+weighted avg       0.86      0.86      0.86      5018
+
+Beat(BERT):
+accuracy: 0.97
+
+ CONCLUSION AND FUTURE WORK
+ A. Research Achievements Summary
+ B. Research Limitations
+ C. Future Research Directions
+ 
